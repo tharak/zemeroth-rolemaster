@@ -1,3 +1,21 @@
+# Zemeroth · Rolemaster
+
+A standalone, browser-first Rolemaster skirmish adaptation of Zemeroth.
+
+**Play:** https://tharak.github.io/zemeroth-rolemaster/
+
+Three battlefields, four party members, declared phases, table-based combat,
+curated spells, local saves and replay. The shared Rust engine lives in
+[rolemasterCore](https://github.com/tharak/rolemasterCore).
+
+**Experimental:** this is a playable implementation checkpoint. Full fumble,
+spell-failure and situational rule coverage is still in progress. Read the
+[controls, architecture, verification and precise rule limitations](docs/rolemaster-skirmish.md).
+
+The original project documentation and credits follow.
+
+---
+
 # ![title image](zemeroth.svg)
 
 [![Github Actions][img_gh-actions]][gh-actions]

@@ -2,3 +2,6 @@
 /assets/img
 /static
 .DS_Store
+
+/output/playwright/
+/.playwright-cli/

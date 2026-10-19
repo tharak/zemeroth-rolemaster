@@ -1,27 +1,37 @@
 <!doctype html>
 <html lang="en">
 <head>
-    <meta charset="utf-8">
-    <title>Zemeroth</title>
-    <style>
-        html,
-        body,
-        canvas {
-            margin: 0;
-            padding: 0;
-            width: 100%;
-            height: 100%;
-            overflow: hidden;
-            position: absolute;
-            background: black;
-            z-index: 0;
-        }
-    </style>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<link rel="icon" href="data:,">
+<title>Zemeroth · Rolemaster</title><link rel="stylesheet" href="skirmish.css">
 </head>
 <body>
-    <canvas id="glcanvas" tabindex='1'></canvas>
-    <!-- Minified and statically hosted version of https://github.com/not-fl3/miniquad/blob/master/native/sapp-wasm/js/gl.js -->
-    <script src="https://not-fl3.github.io/miniquad-samples/gl.js"></script>
-    <script>load("zemeroth.wasm");</script>
-</body>
-</html>
+<header><div><span class="eyebrow">TACTICAL SKIRMISH</span><h1>Zemeroth <span>· Rolemaster</span></h1></div><button id="menu-button" aria-controls="setup" aria-expanded="false">New game</button></header>
+<main>
+<section class="battlefield" aria-label="Battlefield"><canvas id="glcanvas" tabindex="0" aria-label="Hex battlefield. Select fighters and enemies using the controls below; tap empty hexes to plan movement."></canvas><div id="round" class="round">Loading battlefield…</div><div id="map-caption"></div></section>
+<aside aria-label="Battle controls">
+<div id="error" role="alert" hidden></div><div id="storage-status" role="status"></div>
+<section id="setup" hidden><h2>Choose your battlefield</h2><label>Scenario<select id="scenario"><option value="0">Open field</option><option value="1">Broken sanctuary</option><option value="2">Narrow approach</option></select></label><label>Seed<input id="seed" type="number" value="2026" min="1" max="4294967295"></label><button id="restart">Start new skirmish</button><p>Starting replaces this device’s current skirmish. Each seed gives repeatable dice.</p></section>
+<div id="roster" class="roster" role="group" aria-label="Your party"></div>
+<div class="unit-heading"><h2 id="fighter-name">Your party</h2><span id="status"></span></div>
+<div id="stats" class="stats"></div>
+<details id="conditions"><summary>Equipment & conditions</summary><div id="condition-text"></div></details>
+<section id="declarations">
+<div class="form-row"><label>Target<select id="target"></select></label><label>Phase<select id="phase"><option>Snap</option><option selected>Normal</option><option>Deliberate</option></select></label></div>
+<div class="form-row"><label>Action<select id="action"><option>Melee</option><option>Press</option><option>React</option><option>Move</option><option>Disengage</option><option>Missile</option><option>Prepare</option><option>Cast</option><option>Reload</option><option value="ChangeWeapon">Change weapon</option><option>Wait</option></select></label><label id="spell-label" hidden>Spell<select id="spell"></select></label></div>
+<div class="form-row"><label>Activity %<input id="activity" type="number" value="100" min="0" max="100" step="5"></label><label>Parry OB<input id="parry" type="number" value="0" min="0" max="200"></label></div>
+<p id="action-help" class="hint">Choose an enemy and declare your attack. Parry trades offensive bonus for defense against that enemy.</p>
+<div class="form-row"><button id="declare">Declare action</button><button id="clear" class="quiet">Clear fighter</button></div>
+<div id="plan" aria-live="polite"></div>
+<button id="commit" class="primary">Commit party · resolve round</button>
+</section>
+<section id="reaction" hidden><p>A react attack is waiting. Choose an enemy within 50 feet in the Target menu.</p><button id="react-target">Attack selected target</button><button id="react-wait">Wait</button></section>
+<section id="playback" hidden><div class="form-row"><button id="pause">Pause</button><button id="step">Step</button><label>Speed<select id="speed"><option value="1.5">Slow</option><option value="0.8" selected>Normal</option><option value="0.2">Fast</option></select></label></div></section>
+<div id="outcome" role="status" hidden></div>
+<details id="log"><summary>Combat log <span id="log-count"></span></summary><ol id="events"></ol></details>
+<details id="replay"><summary>Replay recorded actions</summary><label>Recorded frame<input type="range" id="replay-frame" min="0" max="0" value="0"></label><p id="replay-caption"></p><button id="close-replay">Return to live battle</button></details>
+<details><summary>How to play & rules status</summary><p>Pick a fighter, choose a phase and action, then declare. You can assign one action in each phase and up to 100% activity. Tap an empty hex to choose a movement destination. Choose a friendly target in the Target menu for healing or blessings. Blur always targets the caster.</p><p>All four party members share your commitment. Undeclared fighters wait. Enemies plan independently before your choices. The engine resolves Snap, Normal, then Deliberate actions in initiative order.</p><p>This is an experimental Rolemaster adaptation. The current rule coverage and remaining source-audit work are listed in the repository. It is not yet the complete planned ruleset.</p><p><a href="https://github.com/tharak/zemeroth-rolemaster">Source & rule coverage</a> · Original game and artwork by <a href="https://github.com/ozkriff/zemeroth">ozkriff and contributors</a></p></details>
+</aside>
+</main>
+<script src="gl.js"></script><script src="audio.js"></script><script src="skirmish.js"></script><script>load("zemeroth.wasm");</script>
+</body></html>

@@ -9,6 +9,7 @@ mod core;
 mod error;
 mod geom;
 mod screen;
+mod tactical;
 mod utils;
 
 type ZResult<T = ()> = Result<T, error::ZError>;
@@ -47,7 +48,7 @@ impl MainState {
 
 fn window_conf() -> window::Conf {
     window::Conf {
-        window_title: "Zemeroth".to_owned(),
+        window_title: "Zemeroth · Rolemaster".to_owned(),
         high_dpi: true,
         ..Default::default()
     }
@@ -65,9 +66,5 @@ async fn main() -> ZResult {
     quad_rand::srand(mq::miniquad::date::now() as _);
     mq::file::set_pc_assets_folder("assets");
     assets::load().await.expect("Can't load assets");
-    let mut state = MainState::new().expect("Can't create the main state");
-    loop {
-        state.tick().expect("Tick failed");
-        window::next_frame().await;
-    }
+    tactical::run().await
 }

@@ -220,6 +220,32 @@ impl Pathfinder {
         }
     }
 
+    /// Terrain-only planning for the Rolemaster adapter. No Zemeroth AP, hazards or reactions.
+    pub fn fill_terrain(&mut self, start: PosHex, open: impl Fn(PosHex) -> bool) {
+        self.queue.clear();
+        self.clean_map();
+        self.push_start_pos_to_queue(start);
+        while let Some(pos) = self.queue.pop_front() {
+            for dir in dirs() {
+                let next = Dir::get_neighbor_pos(pos, dir);
+                if !self.map.is_inboard(next) || !open(next) {
+                    continue;
+                }
+                let cost = MovePoints(self.map.tile(pos).cost.0 + 1);
+                if cost < self.map.tile(next).cost {
+                    self.map.set_tile(
+                        next,
+                        Tile {
+                            cost,
+                            parent_dir: Some(Dir::get_dir_from_to(next, pos)),
+                        },
+                    );
+                    self.queue.push_back(next);
+                }
+            }
+        }
+    }
+
     pub fn path(&self, destination: PosHex) -> Option<Path> {
         if self.map.tile(destination).cost == max_cost() {
             return None;

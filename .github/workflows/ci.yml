@@ -1,127 +1,42 @@
-name: CI
-
-on: [pull_request, push]
-
+name: Skirmish checks and Pages
+on:
+  push:
+    branches: [master]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: pages-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
-  lints:
-    name: Lints
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v2
-
-      - name: Install packages
-        run: sudo apt -yq --no-install-suggests --no-install-recommends install libx11-dev libxi-dev libgl1-mesa-dev libasound2-dev
-
-      - name: Install rust
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-          components: clippy, rustfmt
-          profile: minimal
-          override: true
-
-      - run: cargo fmt --all -- --check
-
-      - run: cargo clippy --all --tests -- -D warnings
-
   build:
-    name: ${{ matrix.build }}
-    runs-on: ${{ matrix.os }}
-
-    strategy:
-      matrix:
-        build: [Linux, macOS, Win32, Win64, Linux-beta]
-
-        include:
-          - build: Linux
-            os: ubuntu-latest
-          - build: macOS
-            os: macOS-latest
-          - build: Win32
-            os: windows-latest
-            rust: stable-i686-pc-windows-msvc
-            target: i686-pc-windows-msvc
-          - build: Win64
-            os: windows-latest
-          - build: Linux-beta
-            os: ubuntu-latest
-            rust: beta
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v2
-
-      - name: Cache
-        uses: actions/cache@v2
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            ~/.cargo/bin/resvg
-            target
-          key: ${{ runner.os }}-${{ matrix.build }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-
-      - name: Install rust
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: ${{ matrix.rust || 'stable' }}
-          target: ${{ matrix.target }}
-          profile: minimal
-          override: true
-
-      - name: Install packages (Linux)
-        if: runner.os == 'Linux'
-        run: |
-          sudo apt-get -yq --no-install-suggests --no-install-recommends install libx11-dev libxi-dev libgl1-mesa-dev libasound2-dev
-
-      - name: Install resvg
-        shell: bash
-        run: |
-          if ! command -v resvg &> /dev/null; then
-            if [ "$RUNNER_OS" == "Windows" ]; then
-              curl -sL https://github.com/RazrFalcon/resvg/releases/download/v0.11.0/viewsvg-win.zip -O
-              7z x viewsvg-win.zip
-              mv resvg ~/.cargo/bin
-            else
-              cargo install resvg
-            fi
-          fi
-
-      - name: Export assets
-        shell: bash
-        run: |
-          ./utils/assets_export.sh
-          ls -lR assets
-
-      - name: Build
-        uses: actions-rs/cargo@v1
-        with:
-          command: build
-          args: --examples --all
-
-      - name: Test
-        uses: actions-rs/cargo@v1
-        with:
-          command: test
-          args: --all
-
-  wasm:
-    name: WASM
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout
-        uses: actions/checkout@v2
-
-      - name: Install rust
-        uses: actions-rs/toolchain@v1
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: stable
-          target: wasm32-unknown-unknown
-          profile: minimal
-          override: true
-
-      - name: Build
-        run: ./utils/wasm/build.sh
+          toolchain: '1.99.0'
+          targets: wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@v2
+      - run: sudo apt-get update && sudo apt-get install -y libasound2-dev libx11-dev libxi-dev libgl1-mesa-dev
+      - run: cargo test --workspace --locked
+      - run: cargo install resvg --version 0.23.0 --locked
+      - run: sh utils/assets_export.sh
+      - run: sh utils/wasm/build.sh
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: static
+  deploy:
+    if: github.event_name != 'pull_request'
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/deploy-pages@v4
+        id: deployment
