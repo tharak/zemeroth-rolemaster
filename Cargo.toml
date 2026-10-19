@@ -31,7 +31,7 @@ mq = { package = "macroquad", version = "0.3" }
 heck = "0.3"
 once_cell = "1.6"
 
-rolemaster-tactical = { git = "https://github.com/tharak/rolemasterCore.git", rev = "75727d77010423a9307b44fc55c1b3c6d6afa7ea" }
+rolemaster-tactical = { git = "https://github.com/tharak/rolemasterCore.git", rev = "8021b23696ca21fa736a6e0b3c99b743a1eea2b6" }
 serde_json = "1"
 
 [dev-dependencies]

@@ -66,7 +66,10 @@ Critical text/effects are generated from the audited shared JavaScript rules.
 
 Remaining source-rule work is material:
 
-- Fumble-table consequences are not yet applied; currently the attack is lost.
+- One-handed and missile weapon fumbles apply table consequences, including dropped
+  and broken weapons, self/friendly criticals, bleeding and loss of actions. Use
+  Recover weapon or Stand up when needed; the AI does the same. Other weapon
+  families are not yet supported. Status-onset timing still needs its source audit.
 - Casting maneuver partial/near/unusual results and the spell-failure table need
   full handling; current casting maneuvers require a result above 60.
 - Opportunity/cancellation rules, missile parry, shield assignment, and the full
@@ -101,8 +104,8 @@ five viewport sizes, declarations, duplicate commits, save/reload, replay, save
 failure, stale tabs and complete battles. It expects the server above.
 
 
-Verified locally on 2026-10-19: 44 game tests plus the upstream documentation
-example, 19 tactical core tests (including 945 JS lookup parity cases), 7 existing
+Verified locally on 2026-10-19: 45 game tests plus the upstream documentation
+example, 22 tactical core tests (including 945 JS lookup parity cases), 7 existing
 Rust core tests, 55 existing JS core tests, and all 180 fieldbook tests. The browser
 smoke completed all three scenarios and passed its five viewport, duplicate
 commit, exact reload, replay, failed-save and stale-tab checks. Review captures

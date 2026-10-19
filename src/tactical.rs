@@ -171,7 +171,9 @@ fn ai_plan_for_team(b: &BattleState, team: u8) -> RoundPlan {
             None => continue,
         };
         let w = &f.weapons[f.weapon];
-        let (activity, action) = if f.has("mustParry", b.round) {
+        let (activity, action) = if f.has("prone", b.round) {
+            (50, Action::StandUp)
+        } else if f.has("mustParry", b.round) || f.has("noAttack", b.round) {
             (0, Action::Wait)
         } else if f.spells.contains(&Spell::ShockBoltI)
             && f.pp >= 2
@@ -196,13 +198,23 @@ fn ai_plan_for_team(b: &BattleState, team: u8) -> RoundPlan {
                     },
                 )
             }
+        } else if f.weapon_recovery.contains_key(&f.weapon) {
+            (100, Action::RecoverWeapon)
+        } else if f.broken_weapons.contains(&f.weapon) {
+            match (0..f.weapons.len()).find(|i| !f.broken_weapons.contains(i)) {
+                Some(index) => (50, Action::ChangeWeapon { index }),
+                None => (0, Action::Wait),
+            }
         } else if w.reload > 0 && f.pos.distance(t.pos) <= 1 {
-            (
-                50,
-                Action::ChangeWeapon {
-                    index: 1.min(f.weapons.len() - 1),
-                },
-            )
+            match f
+                .weapons
+                .iter()
+                .enumerate()
+                .find(|(index, weapon)| weapon.reload == 0 && !f.broken_weapons.contains(index))
+            {
+                Some((index, _)) => (50, Action::ChangeWeapon { index }),
+                None => (0, Action::Wait),
+            }
         } else if w.reload > 0 && f.reload_left > 0 {
             (f.reload_left.min(100) as u8, Action::Reload)
         } else if f.pos.distance(t.pos) * 5 <= w.range && b.line_of_sight(f.pos, t.pos) {
@@ -402,6 +414,8 @@ impl Game {
                         target: if spell == Spell::Blur { f.id } else { target },
                     },
                     "Reload" => Action::Reload,
+                    "RecoverWeapon" => Action::RecoverWeapon,
+                    "StandUp" => Action::StandUp,
                     "ChangeWeapon" => Action::ChangeWeapon {
                         index: (f.weapon + 1) % f.weapons.len(),
                     },
@@ -772,6 +786,23 @@ mod tests {
                 s.id, b.round
             );
         }
+    }
+    #[test]
+    fn ai_recovers_dropped_weapons_and_switches_broken_weapons() {
+        let s = scenarios().remove(0);
+        let mut b = BattleState::new(s.fighters, s.radius, s.walls, 3).unwrap();
+        b.fighters[0].weapon_recovery.insert(0, 2);
+        let plan = ai_plan_for_team(&b, 0);
+        assert!(plan
+            .actions
+            .iter()
+            .any(|a| a.actor == b.fighters[0].id && matches!(a.action, Action::RecoverWeapon)));
+        b.fighters[0].weapon_recovery.clear();
+        b.fighters[0].broken_weapons.insert(0);
+        let plan = ai_plan_for_team(&b, 0);
+        assert!(plan.actions.iter().any(|a| a.actor == b.fighters[0].id
+            && matches!(a.action, Action::ChangeWeapon { index: 1 })));
+        b.validate_plan(&plan, Some(0)).unwrap();
     }
     #[test]
     fn ai_is_independent_of_player_plan() {

@@ -40,7 +40,10 @@ async page => {
      const target=b.fighters.filter(t=>t.team===1&&active(t)).sort((a,z)=>dist(f.pos,a.pos)-dist(f.pos,z.pos)||a.id-z.id)[0];if(!target)continue;
      await c({type:'Select',id:f.id});await c({type:'Target',id:target.id});
      let kind='Melee',phase='Normal',activity=100,spell=null;
-     if(f.spells.includes('ShockBoltI')&&f.pp>=2){spell='ShockBoltI';kind=f.preparation?.spell===spell?'Cast':'Prepare';activity=kind==='Cast'?75:90;}
+     if(f.conditions.some(c=>c.starts<=b.round&&c.effect.kind==='prone')){kind='StandUp';activity=50;}
+     else if(f.weapon_recovery?.[f.weapon]){kind='RecoverWeapon';activity=100;}
+     else if(f.conditions.some(c=>c.starts<=b.round&&c.effect.kind==='noAttack')){kind='Wait';activity=0;}
+     else if(f.spells.includes('ShockBoltI')&&f.pp>=2){spell='ShockBoltI';kind=f.preparation?.spell===spell?'Cast':'Prepare';activity=kind==='Cast'?75:90;}
      else if(dist(f.pos,target.pos)>1){
       const walls=new Set(b.walls.map(key));const occupied=new Set(b.fighters.filter(t=>t.id!==f.id&&active(t)).map(t=>key(t.pos)));
       const seen=new Set([key(f.pos)]),queue=[{pos:f.pos,path:[]}];let route=[];
