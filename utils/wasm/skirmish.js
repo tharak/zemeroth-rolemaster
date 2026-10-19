@@ -53,7 +53,7 @@ function poll(){
  try{
   if(typeof wasm_exports!=='undefined'&&wasm_exports.rm_snapshot_len){const len=wasm_exports.rm_snapshot_len();if(len){const s=JSON.parse(new TextDecoder().decode(new Uint8Array(wasm_exports.memory.buffer,wasm_exports.rm_snapshot_ptr(),len)));
    if(!restored){restored=true;send({type:"Motion",reduced:matchMedia("(prefers-reduced-motion: reduce)").matches});try{const stored=localStorage.getItem(storageKey);if(stored){const record=JSON.parse(stored);send({type:'Restore',save:record.save});lastRevision=s.revision;requestAnimationFrame(poll);return;}}catch(error){$('storage-status').textContent='Saved battle could not be loaded: '+error.message;}}
-   if(s.revision!==lastRevision){lastRevision=s.revision;snapshot=s;render(s);const serialized=JSON.stringify(s.save);if(!stale&&serialized!==lastSerialized){try{localStorage.setItem(storageKey,JSON.stringify({tab:tabId,save:s.save}));lastSerialized=serialized;}catch(error){$('storage-status').textContent='Autosave failed. Keep this tab open; your current battle is still in memory. '+error.message;}}}
+   if(s.revision!==lastRevision){lastRevision=s.revision;snapshot=s;render(s);const serialized=JSON.stringify(s.save);if(!stale&&serialized!==lastSerialized){try{localStorage.setItem(storageKey,JSON.stringify({tab:tabId,save:s.save}));lastSerialized=serialized;if($("storage-status").textContent.startsWith("Autosave failed"))$("storage-status").textContent="";}catch(error){$('storage-status').textContent='Autosave failed. Keep this tab open; your current battle is still in memory. '+error.message;}}}
   }}
  }catch(error){$('error').hidden=false;$('error').textContent='Game interface error: '+error.message;}
  requestAnimationFrame(poll);
