@@ -112,10 +112,19 @@ pub extern "C" fn rm_alloc(len: usize) -> *mut u8 {
 #[no_mangle]
 pub unsafe extern "C" fn rm_command(ptr: *mut u8, len: usize) {
     let bytes = Box::from_raw(std::ptr::slice_from_raw_parts_mut(ptr, len));
-    let command = serde_json::from_slice(&bytes).unwrap_or_else(|e| Command::Invalid {
+    let command = parse_command(&bytes).unwrap_or_else(|e| Command::Invalid {
         message: format!("Cannot read command or saved battle: {e}"),
     });
     INPUT.with(|q| q.borrow_mut().push(command));
+}
+// Deserialize nested saves with serde_json's numeric map-key support. An internally
+// tagged enum buffers content and otherwise loses that support for u32-keyed maps.
+fn parse_command(bytes: &[u8]) -> Result<Command, serde_json::Error> {
+    let value: serde_json::Value = serde_json::from_slice(bytes)?;
+    if value["type"] == "Restore" {
+        return serde_json::from_value(value["save"].clone()).map(|save| Command::Restore { save });
+    }
+    serde_json::from_slice(bytes)
 }
 #[no_mangle]
 pub extern "C" fn rm_snapshot_ptr() -> *const u8 {
@@ -704,6 +713,21 @@ pub async fn run() -> crate::ZResult {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn restore_command_preserves_numeric_map_keys_and_rng() {
+        let mut game = Game::new(0, 2026).unwrap();
+        let plan = ai_plan_for_team(&game.save.battle, 0);
+        game.save.battle.commit(plan).unwrap();
+        let bytes =
+            serde_json::to_vec(&serde_json::json!({"type":"Restore","save":game.save})).unwrap();
+        match parse_command(&bytes).unwrap() {
+            Command::Restore { save } => {
+                assert_eq!(save.battle.rng, game.save.battle.rng);
+                assert_eq!(save.battle.initiative, game.save.battle.initiative);
+            }
+            _ => panic!("wrong command"),
+        }
+    }
     #[test]
     fn scenarios_and_ai_are_valid() {
         for s in scenarios() {
