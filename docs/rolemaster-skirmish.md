@@ -99,3 +99,12 @@ atomic errors and paused React choices.
 `tests/browser-smoke.js` is a Playwright CLI `run-code --filename` test, including
 five viewport sizes, declarations, duplicate commits, save/reload, replay, save
 failure, stale tabs and complete battles. It expects the server above.
+
+
+Verified locally on 2026-10-19: 44 game tests plus the upstream documentation
+example, 19 tactical core tests (including 945 JS lookup parity cases), 7 existing
+Rust core tests, 55 existing JS core tests, and all 180 fieldbook tests. The browser
+smoke completed all three scenarios and passed its five viewport, duplicate
+commit, exact reload, replay, failed-save and stale-tab checks. Review captures
+are written under `output/playwright/` (create this directory before running the
+CLI smoke; screenshots are intentionally ignored by Git).

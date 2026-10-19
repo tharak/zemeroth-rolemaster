@@ -57,8 +57,8 @@ async page => {
   assert(result.round>1,`scenario ${scenario} never fought`);
  }
  await command({type:'Restart',scenario:1,seed:2026});
- await p.setViewportSize({width:1280,height:800});await p.screenshot({path:'/tmp/zemeroth-rolemaster/output/playwright/desktop.png'});
- await p.setViewportSize({width:360,height:640});await p.screenshot({path:'/tmp/zemeroth-rolemaster/output/playwright/mobile.png'});
+ await p.setViewportSize({width:1280,height:800});await p.screenshot({path:'output/playwright/desktop.png'});
+ await p.setViewportSize({width:360,height:640});await p.screenshot({path:'output/playwright/mobile.png'});
  const other=await context.newPage();await other.goto('http://127.0.0.1:8022');await other.waitForFunction(()=>snapshot?.save?.battle);
  await other.evaluate(()=>send({type:'Select',id:3}));await p.waitForFunction(()=>document.querySelector('#storage-status').textContent.includes('Another tab'));
  assert(await p.locator('#commit').isDisabled(),'stale tab can commit');
