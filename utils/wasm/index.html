@@ -19,13 +19,14 @@
 <section id="declarations">
 <div class="form-row"><label>Target<select id="target"></select></label><label>Phase<select id="phase"><option>Snap</option><option selected>Normal</option><option>Deliberate</option></select></label></div>
 <div class="form-row"><label>Action<select id="action"><option>Melee</option><option>Press</option><option>React</option><option>Move</option><option>Disengage</option><option>Missile</option><option>Prepare</option><option>Cast</option><option>Reload</option><option value="ChangeWeapon">Change weapon</option><option>Wait</option></select></label><label id="spell-label" hidden>Spell<select id="spell"></select></label></div>
+<label id="destination-label" hidden>Destination hex<select id="destination"><option value="">Choose a destination</option></select></label>
 <div class="form-row"><label>Activity %<input id="activity" type="number" value="100" min="0" max="100" step="5"></label><label>Parry OB<input id="parry" type="number" value="0" min="0" max="200"></label></div>
 <p id="action-help" class="hint">Choose an enemy and declare your attack. Parry trades offensive bonus for defense against that enemy.</p>
 <div class="form-row"><button id="declare">Declare action</button><button id="clear" class="quiet">Clear fighter</button></div>
 <div id="plan" aria-live="polite"></div>
 <button id="commit" class="primary">Commit party · resolve round</button>
 </section>
-<section id="reaction" hidden><p>A react attack is waiting. Choose an enemy within 50 feet in the Target menu.</p><button id="react-target">Attack selected target</button><button id="react-wait">Wait</button></section>
+<section id="reaction" hidden><p>A react attack is waiting. Choose an enemy within 50 feet.</p><label>React target<select id="react-target-select"></select></label><button id="react-target">Attack selected target</button><button id="react-wait">Wait</button></section>
 <section id="playback" hidden><div class="form-row"><button id="pause">Pause</button><button id="step">Step</button><label>Speed<select id="speed"><option value="1.5">Slow</option><option value="0.8" selected>Normal</option><option value="0.2">Fast</option></select></label></div></section>
 <div id="outcome" role="status" hidden></div>
 <details id="log"><summary>Combat log <span id="log-count"></span></summary><ol id="events"></ol></details>

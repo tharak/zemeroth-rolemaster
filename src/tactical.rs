@@ -309,7 +309,8 @@ impl Game {
                 event: events.last().cloned(),
             });
         }
-        if self.save.battle.awaiting_react.is_some() {
+        if let Some(id) = self.save.battle.awaiting_react {
+            self.save.selected = id;
             self.paused = true;
         }
         if !self.save.battle.resolving {
@@ -460,7 +461,9 @@ impl Game {
             Command::Speed { seconds } => self.seconds = seconds.clamp(0.1, 3.),
             Command::Restart { scenario, seed } => {
                 let revision = self.revision;
+                let reduced = self.reduced_motion;
                 *self = Self::new(scenario, seed)?;
+                self.reduced_motion = reduced;
                 self.revision = revision;
             }
             Command::Restore { save } => {
