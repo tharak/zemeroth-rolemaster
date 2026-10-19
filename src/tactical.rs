@@ -52,6 +52,11 @@ struct Save {
 #[derive(Deserialize)]
 #[serde(tag = "type")]
 enum Command {
+    BoardClick {
+        x: f32,
+        y: f32,
+        mode: String,
+    },
     Invalid {
         message: String,
     },
@@ -335,6 +340,43 @@ impl Game {
     }
     fn command(&mut self, c: Command) -> Result<(), String> {
         match c {
+            Command::BoardClick { x, y, mode } => {
+                if self.replay.is_some()
+                    || self.save.battle.finished
+                    || (self.save.battle.resolving && self.save.battle.awaiting_react.is_none())
+                {
+                    return Err("Wait for declarations before choosing on the battlefield".into());
+                }
+                let (w, h) = (screen_width(), screen_height());
+                let size = (w / 18.).min(h / 13.).max(10.);
+                let click = vec2(x * w, y * h) - vec2(w / 2., h / 2.);
+                let p = hex(geom::point_to_hex(size, click));
+                // Sprites extend above their hex: accept clicks on the body as well as its tile.
+                let body = self.save.battle.fighters.iter().rev().find(|f| {
+                    let offset = click - geom::hex_to_point(size, pos(f.pos));
+                    offset.x.abs() < size * 0.55
+                        && offset.y > -size * 1.45
+                        && offset.y < size * 0.25
+                });
+                let fighter =
+                    body.or_else(|| self.save.battle.fighters.iter().find(|f| f.pos == p));
+                if let Some(f) = fighter {
+                    let id = f.id;
+                    return self.command(
+                        if mode == "target" || self.save.battle.awaiting_react.is_some() {
+                            Command::Target { id }
+                        } else if mode == "move" {
+                            return Err("Choose an empty hex for movement".into());
+                        } else {
+                            Command::Select { id }
+                        },
+                    );
+                }
+                if mode == "target" {
+                    return Err("Click a fighter to choose your target".into());
+                }
+                return self.command(Command::Destination { q: p.q, r: p.r });
+            }
             Command::Invalid { message } => return Err(message),
             Command::ReactChoice { target } => {
                 self.save.battle.choose_react(target)?;
@@ -356,8 +398,8 @@ impl Game {
             }
             Command::Destination { q, r } => {
                 let p = Hex { q, r };
-                if !self.save.battle.inboard(p) {
-                    return Err("Outside the battlefield".into());
+                if !self.save.battle.open(p, self.save.selected) {
+                    return Err("Choose an open hex on the battlefield".into());
                 }
                 self.save.destination = Some(p);
             }
@@ -551,6 +593,16 @@ impl Game {
                 }
             }
         }
+        if self.replay.is_none() {
+            if let Some(destination) = self.save.destination {
+                if let Some(f) = self.save.battle.fighter(self.save.selected) {
+                    for p in path(&self.save.battle, f.id, destination, f.pos) {
+                        let v = point(p);
+                        draw_circle(v.x, v.y, 3., SKYBLUE);
+                    }
+                }
+            }
+        }
         for declaration in &self.save.draft.actions {
             if let Action::Move { path } | Action::Disengage { path } = &declaration.action {
                 for p in path {
@@ -630,6 +682,7 @@ impl Game {
                 WHITE,
             );
         }
+        #[cfg(not(target_arch = "wasm32"))]
         if is_mouse_button_pressed(MouseButton::Left) && self.replay.is_none() {
             let (x, y) = mouse_position();
             let p = hex(geom::point_to_hex(size, vec2(x, y) - origin));

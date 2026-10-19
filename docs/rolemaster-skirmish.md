@@ -30,7 +30,9 @@ called by the Rolemaster runtime.
 
 Choose a party member, an action, phase and activity percentage, and declare.
 One action per fighter per phase and 100% total activity are enforced. Select an
-empty hex to preview a movement destination. Full melee attacks need a fixed
+empty hex to choose movement and preview its blue route. Click a fighter sprite
+or its hex to select it; use Pick target to target an ally without switching the
+acting fighter. The coordinate list is an optional collapsed keyboard fallback. Full melee attacks need a fixed
 foe; Press requires an adjacent foe at declaration. React pauses resolution for
 a target choice within 50 feet. Select a friendly target for healing/blessings;
 Blur always targets the caster. Commit the party to resolve the round.

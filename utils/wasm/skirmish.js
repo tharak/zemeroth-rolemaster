@@ -14,8 +14,23 @@ function send(command){
 }
 function element(tag,text,cls){const el=document.createElement(tag);if(text!==undefined)el.textContent=text;if(cls)el.className=cls;return el;}
 function describe(a){const kind=typeof a.action==='string'?a.action:Object.keys(a.action)[0];const details=typeof a.action==='object'?a.action[kind]:{};return `${a.phase} · ${a.activity}% · ${kind}${details.spell?' '+labels[details.spell]:''}${details.target?' → #'+details.target:''}${details.path?' · '+details.path.length*5+' ft':''}`;}
+let boardMode='select',lastDestination='';
+function setBoardMode(mode){boardMode=mode;for(const m of ['select','move','target'])$('pick-'+m).setAttribute('aria-pressed',String(m===mode));}
 function actionHelp(){const kind=$('action').value;$('spell-label').hidden=!['Prepare','Cast'].includes(kind);$('destination-label').hidden=!['Move','Disengage'].includes(kind);const values={Press:100,React:100,Melee:100,Missile:60,Move:$('phase').value==='Snap'?20:$('phase').value==='Normal'?50:80,Disengage:25,Prepare:90,Cast:$('spell').value==='Blur'?10:75,Reload:50,RecoverWeapon:100,StandUp:50,ChangeWeapon:50,Wait:0};$('activity').value=values[kind];$('action-help').textContent=({Move:'Tap an empty hex on the battlefield. The dotted route is checked against your activity budget.',Disengage:'Choose an empty hex within 10 feet; costs 25% activity.',Prepare:'Spend 90% preparing this spell. Cast it in a later round to reduce casting penalties.',Cast:'Healing and blessings require a friendly target. Blur targets yourself. Offensive spells need an enemy and clear line of sight.',RecoverWeapon:'Spend a full round recovering your dropped weapon. The status shows how many rounds remain.',StandUp:'Stand up from prone for 50% activity.',Reload:'Shortbow reload costs 50% activity. It must finish before firing.',ChangeWeapon:'Change to the next weapon for 50% activity.'})[kind]||'Choose an enemy. Parry trades offensive bonus for defense against that enemy.';}
-for(const id of ['action','phase','spell'])$(id).addEventListener('change',actionHelp);
+for(const id of ['action','phase','spell'])$(id).addEventListener('change',()=>{actionHelp();setBoardMode(['Move','Disengage'].includes($('action').value)?'move':'target');});
+$('pick-select').onclick=()=>setBoardMode('select');
+$('pick-move').onclick=()=>{$('action').value='Move';$('phase').value='Deliberate';actionHelp();setBoardMode('move');};
+$('pick-target').onclick=()=>setBoardMode('target');
+let pointerStart=null;
+$('glcanvas').addEventListener('pointerdown',e=>{if(e.isPrimary&&e.button===0)pointerStart={x:e.clientX,y:e.clientY};});
+$('glcanvas').addEventListener('pointercancel',()=>pointerStart=null);
+$('glcanvas').addEventListener('pointerup',e=>{
+ if(!e.isPrimary||!pointerStart)return;
+ const start=pointerStart;pointerStart=null;
+ if(Math.hypot(e.clientX-start.x,e.clientY-start.y)>12)return;
+ const rect=$('glcanvas').getBoundingClientRect();
+ send({type:'BoardClick',x:(e.clientX-rect.left)/rect.width,y:(e.clientY-rect.top)/rect.height,mode:boardMode});
+});
 $('menu-button').onclick=()=>{const open=$('setup').hidden;$('setup').hidden=!open;$('menu-button').setAttribute('aria-expanded',String(open));if(open)$('scenario').focus();};
 $('restart').onclick=()=>{const seed=Number($('seed').value);if(!Number.isSafeInteger(seed)||seed<1||seed>4294967295){$('error').hidden=false;$('error').textContent='Seed must be an integer between 1 and 4294967295.';return;}send({type:'Restart',scenario:Number($('scenario').value),seed});$('setup').hidden=true;$('menu-button').setAttribute('aria-expanded','false');};
 $('destination').onchange=()=>{if($('destination').value){const [q,r]=$('destination').value.split(',').map(Number);send({type:'Destination',q,r});}};
@@ -50,10 +65,18 @@ function render(s){
   }
   $('destination').replaceChildren(...options);$('destination').dataset.signature=mapSignature;
  }
+ const destinationKey=save.destination?JSON.stringify(save.destination):'';
+ if(destinationKey&&destinationKey!==lastDestination&&!b.resolving){
+  if(!['Move','Disengage'].includes($('action').value)){$('action').value='Move';$('phase').value='Deliberate';actionHelp();}
+  setBoardMode('move');
+ }
+ lastDestination=destinationKey;
+ $('board-feedback').textContent=save.destination&&['Move','Disengage'].includes($('action').value)?'Destination marked on the battlefield. Review the blue route, then declare your move.':`Target: ${b.fighters.find(t=>t.id===save.target)?.name||'none'}. Use Pick target, then click a fighter.`;
+ for(const m of ['select','move','target'])$('pick-'+m).disabled=stale||s.replay!==null||b.finished||(b.resolving&&!b.awaiting_react);
  $('destination').value=save.destination?`${save.destination.q},${save.destination.r}`:'';
 
  $('plan').replaceChildren(...save.draft.actions.filter(a=>a.actor===f.id).map(a=>element('p',describe(a))));
- const total=save.draft.actions.filter(a=>a.actor===f.id).reduce((n,a)=>n+a.activity,0);$('plan').append(element('p',`${total}% declared · ${100-total}% unused${save.destination?` · Destination (${save.destination.q}, ${save.destination.r})`:''}`));
+ const total=save.draft.actions.filter(a=>a.actor===f.id).reduce((n,a)=>n+a.activity,0);$('plan').append(element('p',`${total}% declared · ${100-total}% unused${save.destination?` · Destination marked on battlefield`:''}`));
  $('reaction').hidden=!b.awaiting_react;if(b.awaiting_react){$('react-target-select').replaceChildren(...b.fighters.filter(t=>t.team!==b.fighters.find(f=>f.id===b.awaiting_react).team&&!t.dead&&t.damage<t.max_hits).map(t=>{const op=element('option',`#${t.id} ${t.name}`);op.value=t.id;return op;}));if([...$('react-target-select').options].some(o=>o.value==save.target))$('react-target-select').value=save.target;}
  $('declarations').hidden=b.resolving||b.finished||s.replay!==null;$('playback').hidden=!b.resolving||s.replay!==null;$('pause').textContent=s.paused?'Resume':'Pause';
  $('outcome').hidden=!b.finished;$('outcome').textContent=b.winner===0?'Victory — the field is yours.':b.winner===null?'Draw — both sides fell.':'Defeat — your party has fallen.';
