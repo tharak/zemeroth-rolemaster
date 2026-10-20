@@ -440,9 +440,13 @@ impl Game {
         }
         let t = self.save.battle.turns.as_ref().unwrap();
         let mut probe = self.save.battle.clone();
-        probe
-            .command_turn(t.active, t.sequence, command, &self.data)
-            .map(|_| ())
+        let events = probe.command_turn(t.active, t.sequence, command, &self.data)?;
+        // Full-round resolution can accept a declaration then cancel it. A direct
+        // click must not offer those targets or consume a turn for that cancellation.
+        if let Some(event) = events.iter().find(|event| event.kind == "cancel") {
+            return Err(event.text.clone());
+        }
+        Ok(())
     }
     fn preview_hex(&mut self, to: Hex, confirm: bool) -> Result<(), String> {
         let b = &self.save.battle;
@@ -808,7 +812,7 @@ impl Game {
                         v,
                         size * 1.78,
                         size * 1.625,
-                        Color::new(0.25, 0.75, 0.9, 0.3),
+                        Color::new(0.12, 0.55, 1., 0.65),
                     );
                 }
                 if self.ready()
@@ -1107,6 +1111,37 @@ mod tests {
         assert!(g.preview.is_none());
         g.command(Command::Select { id: actor }).unwrap();
         assert_eq!(g.action, "Attack");
+    }
+    #[test]
+    fn cancelled_attacks_never_become_confirmable_targets() {
+        let mut g = player_game();
+        let actor = g.save.selected;
+        let enemy = g
+            .save
+            .battle
+            .fighters
+            .iter()
+            .find(|f| f.team == 1)
+            .unwrap()
+            .id;
+        let f = g
+            .save
+            .battle
+            .fighters
+            .iter_mut()
+            .find(|f| f.id == actor)
+            .unwrap();
+        f.pos = Hex { q: -4, r: 0 };
+        f.weapon = 0;
+        f.weapons[0].range = 5;
+        f.weapons[0].reload = 0;
+        let before = serde_json::to_string(&g.save.battle).unwrap();
+        assert!(g.preview_target(enemy, true).is_err());
+        assert!(g.preview_target(enemy, true).is_err());
+        assert!(g.preview.is_none());
+        assert_eq!(serde_json::to_string(&g.save.battle).unwrap(), before);
+        g.publish();
+        assert!(!g.targets.contains(&enemy));
     }
     #[test]
     fn movement_highlights_follow_budget_and_obstacles() {

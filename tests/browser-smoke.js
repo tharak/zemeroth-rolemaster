@@ -40,6 +40,7 @@ async page => {
  await p.waitForTimeout(100);
  assert((await read()).save.selected===actor,'targeting changed actor');
  assert(JSON.stringify((await read()).save.battle)===beforeInvalid,'invalid target changed battle');
+ assert((await read()).interaction.preview===null,'invalid target became confirmable');
  // Reserve persists through playback, and duplicate action consumes no dice.
  const sequence=(await read()).save.battle.turns.sequence;
  await p.getByRole('button',{name:'Parry',exact:true}).click();await p.waitForFunction(sequence=>snapshot.save.battle.turns.sequence>sequence,sequence);
