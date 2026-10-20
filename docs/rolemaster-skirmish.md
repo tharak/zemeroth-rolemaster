@@ -10,14 +10,21 @@ ring and initiative list identify the active fighter. Any fighter can be
 inspected or targeted; only your active fighter accepts commands.
 
 Move optionally before acting, up to 25 feet for the current 50-foot profiles.
-Tap/click an empty hex (or use Destination), inspect the blue route, then press
-**Move here**. The coordinate menu supplies a keyboard alternative. Movement can
+Your active fighter is selected automatically. Click it to show blue reachable
+hexes; click another ally to inspect it. Click a reachable hex once to preview
+the route and movement cost, then click the same hex again to move. Movement can
 be split across confirmations but cannot resume after the main action.
 
-Choose **Attack** or **Cast**, choose a target, then confirm. Attack uses the
-equipped melee/missile weapon. Friendly spells target allies; Blur targets the
-caster. Casting is always unprepared and uses the existing unprepared penalties.
-All actions use Normal timing; movement does not reduce attack OB.
+Choose **Attack** or **Cast**. Click a highlighted target once to preview, then
+click it again to execute. Enemy clicks keep your acting fighter selected.
+Friendly spells highlight allies; Blur highlights only the caster. Casting is
+always unprepared and uses the existing unprepared penalties. All actions use
+Normal timing; movement does not reduce attack OB.
+
+There are no selection-mode or confirmation buttons. Mouse and touch use the
+same two-click flow. Escape cancels a preview. The collapsed **Keyboard controls**
+section provides fighter, reachable destination and valid target menus; Enter
+confirms a destination or target. Reloading always disarms the previous preview.
 
 **Parry** creates a reserve equal to the usable melee weapon's nonnegative full
 OB against all melee opponents. Each incoming melee attack spends the smallest
@@ -44,7 +51,11 @@ M confirm movement, C end turn, Space pause, N step.
   browser bridge. Enemy choices use the battlefield at the start of their turn
   (and again after movement); no round-wide enemy plan is queued.
 - Commands include the expected actor and monotonic sequence. Core rejection of
-  duplicate/out-of-turn commands is atomic, including RNG and resources.
+  duplicate/out-of-turn commands is atomic, including RNG and resources. The
+  adapter also rejects repeated board inputs from an old snapshot revision.
+- Interaction previews are transient. Reachable hexes and valid targets are
+  checked against cloned core state and published for both canvas and keyboard
+  controls; probing never changes live RNG or combat state.
 - Saves version 2 use `zemeroth-rolemaster.skirmish.v2`, including complete core
   state, movement spent, initiative position, RNG as a decimal string, reserves,
   and recorded playback. Reload pauses playback without rerolling or reapplying.
@@ -95,7 +106,10 @@ python3 -m http.server 8022 --directory static
 five viewport sizes, absence of declaration controls, touch movement and target
 selection, duplicate movement/actions, exact mid-turn reload, reserves, replay,
 failed saves, legacy preservation, stale tabs and completion of all three maps.
-Create `output/playwright/` for its ignored screenshots.
+`tests/direct-interaction-browser.js` additionally checks mouse attacks, repeated
+confirmations, ally inspection, touch healing, self-casting, cancellation, preview
+disarming after reload, and keyboard movement. Create `output/playwright/` for
+ignored screenshots.
 
 The Rust game suite includes deterministic save/reload comparison at every step
 of all three simplified battles, plus retained upstream and full-round tests.

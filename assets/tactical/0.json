@@ -1,7 +1,7 @@
 {
   "id": 0,
   "name": "Open field",
-  "description": "A clear battlefield. Learn declarations, parry and spell preparation.",
+  "description": "A clear battlefield. Learn movement, individual turns, parry and casting.",
   "radius": 4,
   "walls": [],
   "fighters": [

@@ -53,8 +53,14 @@ enum Command {
     BoardClick {
         x: f32,
         y: f32,
-        mode: String,
+        revision: u64,
     },
+    ChooseAction {
+        kind: String,
+        spell: Option<Spell>,
+    },
+    Confirm,
+    Cancel,
     Invalid {
         message: String,
     },
@@ -343,6 +349,12 @@ fn ai_turn(b: &BattleState) -> TurnCommand {
     TurnCommand::Act(action)
 }
 
+#[derive(Clone, Serialize, PartialEq)]
+#[serde(tag = "kind")]
+enum Preview {
+    Move { to: Hex, feet: i32, sequence: u64 },
+    Target { id: u32, sequence: u64 },
+}
 struct Game {
     save: Save,
     data: DataPack,
@@ -353,6 +365,11 @@ struct Game {
     revision: u64,
     replay: Option<usize>,
     reduced_motion: bool,
+    action: String,
+    spell: Option<Spell>,
+    preview: Option<Preview>,
+    reachable: Vec<Hex>,
+    targets: Vec<u32>,
 }
 impl Game {
     fn new(scenario: usize, seed: u64) -> Result<Self, String> {
@@ -385,10 +402,126 @@ impl Game {
             revision: 1,
             replay: None,
             reduced_motion: false,
+            action: "Attack".into(),
+            spell: None,
+            preview: None,
+            reachable: vec![],
+            targets: vec![],
         })
     }
-    fn publish(&self) {
-        let snapshot = serde_json::json!({"revision":self.revision,"save":self.save,"error":self.error,"paused":self.paused,"replay":self.replay,"scenarios":scenarios().iter().map(|s|serde_json::json!({"name":s.name,"description":s.description})).collect::<Vec<_>>()});
+    fn ready(&self) -> bool {
+        let b = &self.save.battle;
+        let t = b.turns.as_ref().unwrap();
+        self.replay.is_none()
+            && !b.finished
+            && !b.resolving
+            && t.main_available
+            && self.save.selected == t.active
+            && b.fighter(t.active).unwrap().team == 0
+    }
+    fn candidate(&self, target: u32) -> Result<TurnCommand, String> {
+        let b = &self.save.battle;
+        let actor = b.turns.as_ref().unwrap().active;
+        let f = b.fighter(actor).unwrap();
+        Ok(TurnCommand::Act(if self.action == "Cast" {
+            Action::Cast {
+                spell: self.spell.ok_or("Choose a spell")?,
+                target,
+            }
+        } else if f.weapons[f.weapon].reload > 0 {
+            Action::Missile { target }
+        } else {
+            Action::Melee { target }
+        }))
+    }
+    fn validate_candidate(&self, command: TurnCommand) -> Result<(), String> {
+        if !self.ready() {
+            return Err("Select your active fighter when playback finishes".into());
+        }
+        let t = self.save.battle.turns.as_ref().unwrap();
+        let mut probe = self.save.battle.clone();
+        probe
+            .command_turn(t.active, t.sequence, command, &self.data)
+            .map(|_| ())
+    }
+    fn preview_hex(&mut self, to: Hex, confirm: bool) -> Result<(), String> {
+        let b = &self.save.battle;
+        let t = b.turns.as_ref().unwrap();
+        let route = path(b, t.active, to, b.fighter(t.active).unwrap().pos);
+        let feet = route.len() as i32 * 5;
+        self.validate_candidate(TurnCommand::Move { path: route })?;
+        let preview = Preview::Move {
+            to,
+            feet,
+            sequence: t.sequence,
+        };
+        if confirm && self.preview.as_ref() == Some(&preview) {
+            return self.command(Command::Confirm);
+        }
+        self.preview = Some(preview);
+        self.save.destination = Some(to);
+        Ok(())
+    }
+    fn preview_target(&mut self, id: u32, confirm: bool) -> Result<(), String> {
+        self.validate_candidate(self.candidate(id)?)?;
+        let preview = Preview::Target {
+            id,
+            sequence: self.save.battle.turns.as_ref().unwrap().sequence,
+        };
+        if confirm && self.preview.as_ref() == Some(&preview) {
+            return self.command(Command::Confirm);
+        }
+        self.preview = Some(preview);
+        self.save.target = Some(id);
+        self.save.destination = None;
+        Ok(())
+    }
+    fn click_fighter(&mut self, id: u32) -> Result<(), String> {
+        let f = self.save.battle.fighter(id).ok_or("Unknown fighter")?;
+        let friendly_spell = self.action == "Cast"
+            && matches!(
+                self.spell,
+                Some(Spell::HealingI | Spell::HealingIII | Spell::BlessI | Spell::Blur)
+            );
+        if self.ready() && (f.team == 1 || friendly_spell) {
+            self.preview_target(id, true)
+        } else {
+            self.command(Command::Select { id })
+        }
+    }
+    fn publish(&mut self) {
+        self.reachable.clear();
+        self.targets.clear();
+        if self.ready() {
+            let b = &self.save.battle;
+            let t = b.turns.as_ref().unwrap();
+            let from = b.fighter(t.active).unwrap().pos;
+            for r in -b.radius..=b.radius {
+                for q in -b.radius..=b.radius {
+                    let to = Hex { q, r };
+                    if from.distance(to) * 5 > t.movement_remaining || !b.open(to, t.active) {
+                        continue;
+                    }
+                    let route = path(b, t.active, to, from);
+                    if self
+                        .validate_candidate(TurnCommand::Move { path: route })
+                        .is_ok()
+                    {
+                        self.reachable.push(to);
+                    }
+                }
+            }
+            for f in &b.fighters {
+                if self
+                    .candidate(f.id)
+                    .and_then(|c| self.validate_candidate(c))
+                    .is_ok()
+                {
+                    self.targets.push(f.id);
+                }
+            }
+        }
+        let snapshot = serde_json::json!({"revision":self.revision,"interaction":{"action":self.action,"spell":self.spell,"preview":self.preview,"reachable":self.reachable,"targets":self.targets},"save":self.save,"error":self.error,"paused":self.paused,"replay":self.replay,"scenarios":scenarios().iter().map(|s|serde_json::json!({"name":s.name,"description":s.description})).collect::<Vec<_>>()});
         SNAPSHOT.with(|s| *s.borrow_mut() = serde_json::to_vec(&snapshot).unwrap());
     }
     fn record(&mut self, events: &[CombatEvent]) {
@@ -403,6 +536,7 @@ impl Game {
         if self.replay.is_some() {
             return Err("Replay is read-only".into());
         }
+        self.preview = None;
         let previous = self.save.battle.turns.as_ref().unwrap().active;
         let events = if self.save.battle.resolving {
             self.save.battle.advance_turn_playback()?
@@ -420,6 +554,8 @@ impl Game {
         self.record(&events);
         let active = self.save.battle.turns.as_ref().unwrap().active;
         if active != previous {
+            self.action = "Attack".into();
+            self.spell = None;
             self.save.selected = active;
             self.save.destination = None;
         }
@@ -441,6 +577,45 @@ impl Game {
             return Err("Replay is read-only; return to the live battle first".into());
         }
         match c {
+            Command::ChooseAction { kind, spell } => {
+                if kind != "Attack" && kind != "Cast" {
+                    return Err("Unknown action".into());
+                }
+                self.action = kind;
+                self.spell = spell;
+                self.preview = None;
+                self.save.destination = None;
+            }
+            Command::Cancel => {
+                self.preview = None;
+                self.save.destination = None;
+            }
+            Command::Confirm => {
+                let preview = self
+                    .preview
+                    .take()
+                    .ok_or("Choose a highlighted hex or target first")?;
+                let t = self.save.battle.turns.as_ref().unwrap();
+                let (kind, sequence) = match preview {
+                    Preview::Move { to, sequence, .. } => {
+                        self.save.destination = Some(to);
+                        ("Move".to_string(), sequence)
+                    }
+                    Preview::Target { id, sequence } => {
+                        self.save.target = Some(id);
+                        (self.action.clone(), sequence)
+                    }
+                };
+                if !self.ready() || sequence != t.sequence {
+                    return Err("Preview expired; choose again".into());
+                }
+                return self.command(Command::Turn {
+                    actor: t.active,
+                    sequence,
+                    kind,
+                    spell: self.spell,
+                });
+            }
             Command::Turn {
                 actor,
                 sequence,
@@ -488,11 +663,15 @@ impl Game {
                     .battle
                     .command_turn(actor, sequence, command, &self.data)?;
                 self.record(&events);
+                self.preview = None;
                 self.save.destination = None;
                 self.paused = false;
                 self.last = get_time();
             }
-            Command::BoardClick { x, y, mode } => {
+            Command::BoardClick { x, y, revision } => {
+                if revision != self.revision {
+                    return Err("Battlefield changed; choose again".into());
+                }
                 if self.replay.is_some()
                     || self.save.battle.finished
                     || (self.save.battle.resolving && self.save.battle.awaiting_react.is_none())
@@ -514,37 +693,24 @@ impl Game {
                     body.or_else(|| self.save.battle.fighters.iter().find(|f| f.pos == p));
                 if let Some(f) = fighter {
                     let id = f.id;
-                    return self.command(
-                        if mode == "target" || self.save.battle.awaiting_react.is_some() {
-                            Command::Target { id }
-                        } else if mode == "move" {
-                            return Err("Choose an empty hex for movement".into());
-                        } else {
-                            Command::Select { id }
-                        },
-                    );
+                    return self.click_fighter(id);
                 }
-                if mode == "target" {
-                    return Err("Click a fighter to choose your target".into());
-                }
-                return self.command(Command::Destination { q: p.q, r: p.r });
+                return self.preview_hex(p, true);
             }
             Command::Invalid { message } => return Err(message),
             Command::Select { id } => {
                 let f = self.save.battle.fighter(id).ok_or("Unknown fighter")?;
                 self.save.selected = f.id;
                 self.save.destination = None;
+                self.preview = None;
+                self.action = "Attack".into();
+                self.spell = None;
             }
             Command::Target { id } => {
-                self.save.battle.fighter(id).ok_or("Unknown target")?;
-                self.save.target = Some(id);
+                return self.preview_target(id, false);
             }
             Command::Destination { q, r } => {
-                let p = Hex { q, r };
-                if !self.save.battle.open(p, self.save.selected) {
-                    return Err("Choose an open hex on the battlefield".into());
-                }
-                self.save.destination = Some(p);
+                return self.preview_hex(Hex { q, r }, false);
             }
             Command::Step => {
                 self.paused = true;
@@ -577,6 +743,9 @@ impl Game {
                     return Err("Unsupported or invalid skirmish save".into());
                 }
                 save.battle.validate_state()?;
+                self.preview = None;
+                self.action = "Attack".into();
+                self.spell = None;
                 self.save = save;
                 self.paused = true;
                 self.replay = None;
@@ -586,6 +755,8 @@ impl Game {
                     return Err("No such replay frame".into());
                 }
                 self.paused = true;
+                self.preview = None;
+                self.save.destination = None;
                 self.replay = index;
             }
         }
@@ -631,12 +802,31 @@ impl Game {
                     let t = a.sprite_frames[&ObjType::from("boulder")][""];
                     texture(t, v - vec2(0., size * 0.35), size * 1.7, size * 1.7, WHITE);
                 }
-                if self.save.destination == Some(p) {
+                if self.ready() && self.reachable.contains(&p) {
+                    texture(
+                        a.textures.map.white_hex,
+                        v,
+                        size * 1.78,
+                        size * 1.625,
+                        Color::new(0.25, 0.75, 0.9, 0.3),
+                    );
+                }
+                if self.ready()
+                    && self
+                        .save
+                        .battle
+                        .fighters
+                        .iter()
+                        .any(|f| f.pos == p && self.targets.contains(&f.id))
+                {
+                    draw_circle_lines(v.x, v.y, size * 0.6, 2., ORANGE);
+                }
+                if self.preview.is_some() && self.save.destination == Some(p) {
                     draw_circle_lines(v.x, v.y, size * 0.5, 2., GOLD);
                 }
             }
         }
-        if self.replay.is_none() {
+        if self.ready() && self.preview.is_some() {
             if let Some(destination) = self.save.destination {
                 if let Some(f) = self.save.battle.fighter(self.save.selected) {
                     for p in path(&self.save.battle, f.id, destination, f.pos) {
@@ -831,6 +1021,109 @@ pub async fn run() -> crate::ZResult {
 #[cfg(test)]
 mod tests {
     use super::*;
+    fn player_game() -> Game {
+        let mut g = Game::new(0, 2026).unwrap();
+        while g
+            .save
+            .battle
+            .fighter(g.save.battle.turns.as_ref().unwrap().active)
+            .unwrap()
+            .team
+            != 0
+        {
+            let t = g.save.battle.turns.as_ref().unwrap();
+            g.save
+                .battle
+                .command_turn(
+                    t.active,
+                    t.sequence,
+                    TurnCommand::Act(Action::Wait),
+                    &g.data,
+                )
+                .unwrap();
+            g.save.battle.advance_turn_playback().unwrap();
+        }
+        g.save.selected = g.save.battle.turns.as_ref().unwrap().active;
+        g
+    }
+    #[test]
+    fn reachable_previews_are_legal_read_only_and_cancelable() {
+        let mut g = player_game();
+        let before = serde_json::to_string(&g.save.battle).unwrap();
+        g.publish();
+        assert!(!g.reachable.is_empty());
+        for to in g.reachable.clone() {
+            g.preview_hex(to, false).unwrap();
+        }
+        assert_eq!(serde_json::to_string(&g.save.battle).unwrap(), before);
+        assert!(g.preview_hex(Hex { q: 99, r: 99 }, false).is_err());
+        g.command(Command::Cancel).unwrap();
+        assert!(g.preview.is_none());
+        assert!(g.command(Command::Confirm).is_err());
+        let save = g.save.clone();
+        g.preview_hex(g.reachable[0], false).unwrap();
+        g.command(Command::Restore { save }).unwrap();
+        assert!(g.preview.is_none());
+        assert!(g.command(Command::Confirm).is_err());
+    }
+    #[test]
+    fn target_preview_preserves_actor_and_action_changes_disarm_it() {
+        let mut g = player_game();
+        let actor = g.save.selected;
+        let origin = g.save.battle.fighter(actor).unwrap().pos;
+        // Isolate one adjacent enemy and guarantee legal melee conditions.
+        let f = g
+            .save
+            .battle
+            .fighters
+            .iter_mut()
+            .find(|f| f.id == actor)
+            .unwrap();
+        f.weapon = 0;
+        f.weapons[0].reload = 0;
+        f.weapons[0].range = 5;
+        let enemy = g
+            .save
+            .battle
+            .fighters
+            .iter_mut()
+            .find(|f| f.team == 1)
+            .unwrap();
+        enemy.pos = Hex {
+            q: origin.q + 1,
+            r: origin.r,
+        };
+        let id = enemy.id;
+        let before = serde_json::to_string(&g.save.battle).unwrap();
+        g.click_fighter(id).unwrap();
+        assert_eq!(g.save.selected, actor);
+        assert!(matches!(g.preview, Some(Preview::Target { id: target, .. }) if target == id));
+        assert_eq!(serde_json::to_string(&g.save.battle).unwrap(), before);
+        g.command(Command::ChooseAction {
+            kind: "Cast".into(),
+            spell: Some(Spell::Blur),
+        })
+        .unwrap();
+        assert!(g.preview.is_none());
+        g.command(Command::Select { id: actor }).unwrap();
+        assert_eq!(g.action, "Attack");
+    }
+    #[test]
+    fn movement_highlights_follow_budget_and_obstacles() {
+        let mut g = player_game();
+        g.publish();
+        let to = g.reachable[0];
+        g.save.battle.walls.insert(to);
+        g.publish();
+        assert!(!g.reachable.contains(&to));
+        g.save.battle.turns.as_mut().unwrap().movement_remaining = 5;
+        g.publish();
+        let from = g.save.battle.fighter(g.save.selected).unwrap().pos;
+        assert!(g.reachable.iter().all(|to| from.distance(*to) == 1));
+        g.save.battle.turns.as_mut().unwrap().movement_remaining = 0;
+        g.publish();
+        assert!(g.reachable.is_empty());
+    }
     #[test]
     fn restore_command_preserves_numeric_map_keys_and_rng() {
         let game = Game::new(0, 2026).unwrap();

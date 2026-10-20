@@ -8,11 +8,11 @@
 <body>
 <header><div><span class="eyebrow">TACTICAL SKIRMISH</span><h1>Zemeroth <span>· Rolemaster</span></h1></div><button id="menu-button" aria-controls="setup" aria-expanded="false">New game</button></header>
 <main>
-<section class="battlefield" aria-label="Battlefield"><canvas id="glcanvas" tabindex="0" aria-label="Hex battlefield. Click or tap fighters to select them, enemies to target them, and empty hexes to plan movement."></canvas><div id="round" class="round">Loading battlefield…</div><div id="map-caption"></div><div id="board-tools" aria-label="Battlefield selection"><button id="pick-select" aria-pressed="true">Select fighter</button><button id="pick-move" aria-pressed="false">Destination</button><button id="pick-target" aria-pressed="false">Pick target</button></div></section>
+<section class="battlefield" aria-label="Battlefield"><canvas id="glcanvas" tabindex="0" aria-label="Hex battlefield. Click or tap fighters to select them, enemies to target them, and empty hexes to plan movement."></canvas><div id="round" class="round">Loading battlefield…</div><div id="map-caption"></div></section>
 <aside aria-label="Battle controls">
 <div id="error" role="alert" hidden></div><div id="storage-status" role="status"></div>
 <section id="setup" hidden><h2>Choose your battlefield</h2><label>Scenario<select id="scenario"><option value="0">Open field</option><option value="1">Broken sanctuary</option><option value="2">Narrow approach</option></select></label><label>Seed<input id="seed" type="number" value="2026" min="1" max="4294967295"></label><button id="restart">Start new skirmish</button><p>Starting replaces this device’s current skirmish. Each seed gives repeatable dice.</p></section>
-<div id="roster" class="roster" role="group" aria-label="Inspect fighters"></div>
+<details id="keyboard-controls"><summary>Keyboard controls</summary><label>Inspect fighter<select id="keyboard-fighter"></select></label><label>Destination hex<select id="destination"></select></label><label>Target<select id="target"></select></label><p>Choose a destination or target, then press Enter to confirm. Escape cancels the preview.</p></details>
 <div class="unit-heading"><h2 id="fighter-name">Your party</h2><span id="status"></span></div>
 <div id="stats" class="stats"></div>
 <details id="conditions"><summary>Equipment & conditions</summary><div id="condition-text"></div></details>
@@ -20,13 +20,9 @@
 <h3 id="turn-title">Initiative</h3><ol id="initiative" aria-label="Initiative order"></ol>
 <p id="turn-budget" role="status"></p>
 <div id="actions">
-<p id="board-feedback" class="hint" aria-live="polite">Choose a destination, then Move here. Movement is optional.</p>
-<details id="destination-label"><summary>Keyboard destination selection</summary><label>Destination hex<select id="destination"><option value="">Choose a destination</option></select></label></details>
-<button id="move-confirm">Move here</button>
+<p id="board-feedback" class="hint" aria-live="polite">Click your active fighter to see reachable hexes. Click a hex or target once to preview, again to confirm.</p>
 <div class="form-row"><button data-action="Attack">Attack</button><button data-action="Parry">Parry</button><button data-action="Cast">Cast</button></div>
-<label>Target<select id="target"></select></label>
 <label id="spell-label" hidden>Spell<select id="spell"></select></label>
-<button id="execute" class="primary">Attack selected target</button>
 <div id="utilities" class="form-row"><button data-action="Reload">Reload</button><button data-action="RecoverWeapon">Recover weapon</button><button data-action="StandUp">Stand up</button><button data-action="ChangeWeapon">Change weapon</button></div>
 <button data-action="Wait">End turn</button>
 <p id="action-help" class="hint">Move up to 25 feet, then take one action. Parry protects against melee attacks until your next turn.</p>
@@ -35,7 +31,7 @@
 <div id="outcome" role="status" hidden></div>
 <details id="log"><summary>Combat log <span id="log-count"></span></summary><ol id="events"></ol></details>
 <details id="replay"><summary>Replay recorded actions</summary><label>Recorded frame<input type="range" id="replay-frame" min="0" max="0" value="0"></label><p id="replay-caption"></p><button id="close-replay">Return to live battle</button></details>
-<details><summary>How to play & rules status</summary><p>Initiative is rolled each round. The highlighted fighter may move up to half their movement (25 feet for these profiles), then take one action. Tap an empty hex, review the blue route, and confirm with Move here. Choose Attack or Cast, select a target, then confirm. Use Pick target to target allies. Blur targets the caster. Other fighters remain inspectable.</p><p>Every action uses Normal timing and ends the turn. End turn waits without attacking. Parry reserves the equipped melee weapon’s OB against all incoming melee attacks; each defense spends only what is needed to prevent hits and criticals. Missiles and spells bypass it. Casting is always unprepared.</p><p>Target and destination menus support keyboard input. Playback can be paused or stepped. Replay is read-only. This experimental adaptation retains the documented rule limitations. <a href="https://github.com/tharak/zemeroth-rolemaster">Source & rule coverage</a> · Original game and artwork by ozkriff and contributors.</p></details>
+<details><summary>How to play & rules status</summary><p>Initiative is rolled each round. The highlighted fighter may move up to half their movement (25 feet for these profiles), then take one action. Click a blue reachable hex to preview the route, then click it again to move. Choose Attack or Cast, click a highlighted target to preview, then click again to confirm. Friendly spells highlight allies; Blur highlights the caster. Escape cancels a preview. Other fighters remain inspectable.</p><p>Every action uses Normal timing and ends the turn. End turn waits without attacking. Parry reserves the equipped melee weapon’s OB against all incoming melee attacks; each defense spends only what is needed to prevent hits and criticals. Missiles and spells bypass it. Casting is always unprepared.</p><p>Target and destination menus support keyboard input. Playback can be paused or stepped. Replay is read-only. This experimental adaptation retains the documented rule limitations. <a href="https://github.com/tharak/zemeroth-rolemaster">Source & rule coverage</a> · Original game and artwork by ozkriff and contributors.</p></details>
 </aside>
 </main>
 <script src="gl.js"></script><script src="audio.js"></script><script src="skirmish.js"></script><script>load("zemeroth.wasm");</script>
