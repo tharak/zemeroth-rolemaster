@@ -434,7 +434,7 @@ dependencies = [
 [[package]]
 name = "game-rules"
 version = "0.1.0"
-source = "git+https://github.com/tharak/rolemasterCore.git?rev=8021b23696ca21fa736a6e0b3c99b743a1eea2b6#8021b23696ca21fa736a6e0b3c99b743a1eea2b6"
+source = "git+https://github.com/tharak/rolemasterCore.git?rev=ffe5a7631bc37044dd466b85744b3dde9734423e#ffe5a7631bc37044dd466b85744b3dde9734423e"
 
 [[package]]
 name = "glam"
@@ -1111,7 +1111,7 @@ dependencies = [
 [[package]]
 name = "rolemaster-rules"
 version = "0.1.0"
-source = "git+https://github.com/tharak/rolemasterCore.git?rev=8021b23696ca21fa736a6e0b3c99b743a1eea2b6#8021b23696ca21fa736a6e0b3c99b743a1eea2b6"
+source = "git+https://github.com/tharak/rolemasterCore.git?rev=ffe5a7631bc37044dd466b85744b3dde9734423e#ffe5a7631bc37044dd466b85744b3dde9734423e"
 dependencies = [
  "game-rules",
 ]
@@ -1119,7 +1119,7 @@ dependencies = [
 [[package]]
 name = "rolemaster-tactical"
 version = "0.1.0"
-source = "git+https://github.com/tharak/rolemasterCore.git?rev=8021b23696ca21fa736a6e0b3c99b743a1eea2b6#8021b23696ca21fa736a6e0b3c99b743a1eea2b6"
+source = "git+https://github.com/tharak/rolemasterCore.git?rev=ffe5a7631bc37044dd466b85744b3dde9734423e#ffe5a7631bc37044dd466b85744b3dde9734423e"
 dependencies = [
  "rolemaster-rules",
  "serde",

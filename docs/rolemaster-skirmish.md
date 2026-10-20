@@ -1,91 +1,87 @@
 # Rolemaster skirmish adaptation
 
-This fork starts directly in a standalone skirmish. The existing Ludus application
-is unchanged. Upstream Zemeroth history, source and licenses are retained; the
-old campaign and combat code are kept for upstream regression tests but are not
-called by the Rolemaster runtime.
-
-## Architecture and reproducibility
-
-- `rolemaster-tactical` in the public `tharak/rolemasterCore` repository owns combat
-  state, RNG, round declarations, initiative, table lookup, conditions and PP.
-  Cargo pins an exact Git revision. No combat rules execute in JavaScript.
-- `src/tactical.rs` owns scenarios, AI plans, UI commands and event projection.
-  Enemy plans are generated from the round-start state before player declarations.
-- Zemeroth's axial geometry, breadth-first pathfinder and original atlas are used
-  for the battlefield. No old AP, armor, damage, hazard or free-reaction rules run.
-- JSON saves contain the entire authoritative state, queue cursor, event log and
-  RNG (as a decimal string to avoid JavaScript's integer rounding). Replay reads
-  recorded frames without mutating the battle or rolling dice.
-- Browser storage uses `zemeroth-rolemaster.skirmish.v1`, separate from Ludus.
-  A tab that observes another tab's save freezes its controls. Save failures are
-  shown in the interface. Reload pauses any in-progress resolution.
-- Rust 1.99.0, Cargo.lock and resvg 0.23.0 are pinned. The loader is vendored from
-  sapp-wasm 0.1.26, with its stale version label corrected and touch coordinates
-  adjusted for an embedded canvas. Audio glue comes from macroquad 0.3.7.
-- resvg 0.45.1 renders this old atlas's exported nodes transparent; use 0.23.0.
-  No source PDFs are copied to the browser distribution.
+This browser game uses individual initiative turns. The separate Ludus/fieldbook
+application and the core's full-round declaration API are unchanged.
 
 ## Playing
 
-Choose a party member, an action, phase and activity percentage, and declare.
-One action per fighter per phase and 100% total activity are enforced. Select an
-empty hex to choose movement and preview its blue route. Click a fighter sprite
-or its hex to select it; use Pick target to target an ally without switching the
-acting fighter. The coordinate list is an optional collapsed keyboard fallback. Full melee attacks need a fixed
-foe; Press requires an adjacent foe at declaration. React pauses resolution for
-a target choice within 50 feet. Select a friendly target for healing/blessings;
-Blur always targets the caster. Commit the party to resolve the round.
+Each round rolls initiative once and interleaves allies and enemies. The gold
+ring and initiative list identify the active fighter. Any fighter can be
+inspected or targeted; only your active fighter accepts commands.
 
-Missing declarations mean waiting. Pause, step and speed controls are available
-during resolution. Restart chooses one of three maps and a deterministic seed.
-Replay displays recorded action snapshots, preserving the current battle.
+Move optionally before acting, up to 25 feet for the current 50-foot profiles.
+Tap/click an empty hex (or use Destination), inspect the blue route, then press
+**Move here**. The coordinate menu supplies a keyboard alternative. Movement can
+be split across confirmations but cannot resume after the main action.
 
-Native keyboard controls currently cover selection (1–4), full attack (A), move
-(M), commit (C), pause (Space) and step (N). The complete declaration interface
-is currently browser-only.
+Choose **Attack** or **Cast**, choose a target, then confirm. Attack uses the
+equipped melee/missile weapon. Friendly spells target allies; Blur targets the
+caster. Casting is always unprepared and uses the existing unprepared penalties.
+All actions use Normal timing; movement does not reduce attack OB.
 
-## Explicit scenario profiles
+**Parry** creates a reserve equal to the usable melee weapon's nonnegative full
+OB against all melee opponents. Each incoming melee attack spends the smallest
+amount that removes both hits and criticals, or the remaining reserve if it cannot
+prevent the hit. Misses and fumbles spend nothing. Missiles and spells bypass it.
+The reserve and each expenditure are displayed. It expires at the start of the
+fighter's next turn, even if that turn is skipped. Existing parry restrictions
+still apply.
 
-All combatants are level five. These are designed skirmish statblocks, not claims
-of verbatim printed character entries. They are fully specified in
-`assets/tactical/{0,1,2}.json`. Strength and Quickness bonuses are zero and base
-movement is 50 feet per round. Terrain is flat, one hex is five feet, and stone
-walls block both movement and line of sight. Dead/unconscious units do not block
-movement. The party has a Fighter (broadsword/shortbow), Cleric (mace), Magician
-(dagger), and Mentalist (dagger). Enemy art is adapted from Zemeroth's imps.
+Attack, Parry, Cast (including Blur), Reload, Recover weapon, Change weapon and
+Stand up each consume the main action. Reload advances up to 100 existing units;
+recovery advances one recovery round. **End turn** waits without attacking.
+Playback finishes before the next fighter acts. Pause, Step and Speed are
+available; Resume continues enemy turns after reloading a paused save. Reduced
+motion suppresses interpolation. Native shortcuts: 1–4 inspect, A attack,
+M confirm movement, C end turn, Space pause, N step.
 
-## Current rules coverage and remaining audit
+## Architecture and saves
 
-The current release is **experimental**, not completion of the full planned
-Rolemaster implementation. Implemented: Snap/Normal/Deliberate ordering, 2d10
-initiative, action budgets, normal movement, disengagement, full/press/react
-attacks, OB allocation to parry, shortbow reload, weapon changes, open-ended d100,
-weapon/bolt attack tables, equipment-selected critical results, bleeding,
-cumulative stun, death timers, structural disability, spell preparation and PP,
-and the seven curated spells. Mentalism attacks use A-10.9.11 before T-3.4 RRs.
-Critical text/effects are generated from the audited shared JavaScript rules.
+- `rolemaster-tactical` in `tharak/rolemasterCore` owns initiative, command
+  validation, movement budget, action availability, reserves, dice, combat tables,
+  conditions, costs and cleanup. Cargo pins an exact Git revision.
+- `src/tactical.rs` owns scenarios, enemy choices, selection, playback and the
+  browser bridge. Enemy choices use the battlefield at the start of their turn
+  (and again after movement); no round-wide enemy plan is queued.
+- Commands include the expected actor and monotonic sequence. Core rejection of
+  duplicate/out-of-turn commands is atomic, including RNG and resources.
+- Saves version 2 use `zemeroth-rolemaster.skirmish.v2`, including complete core
+  state, movement spent, initiative position, RNG as a decimal string, reserves,
+  and recorded playback. Reload pauses playback without rerolling or reapplying.
+- Version 1 remains untouched under `zemeroth-rolemaster.skirmish.v1`. Its queued
+  declarations are never interpreted as turns. A notice explains that those
+  battles must restart under the new rules.
+- Replay reads recorded fighters without changing live combat. Commands that
+  would advance combat are rejected during replay. Save failures are shown;
+  another tab's save freezes local commands until reload.
+- Round cleanup (including bleeding, condition expiration and death timers) runs
+  once after the last initiative entry. Victory is finalized after cleanup.
 
-Remaining source-rule work is material:
+## Profiles and limitations
 
-- One-handed and missile weapon fumbles apply table consequences, including dropped
-  and broken weapons, self/friendly criticals, bleeding and loss of actions. Use
-  Recover weapon or Stand up when needed; the AI does the same. Other weapon
-  families are not yet supported. Status-onset timing still needs its source audit.
-- Casting maneuver partial/near/unusual results and the spell-failure table need
-  full handling; current casting maneuvers require a result above 60.
-- Opportunity/cancellation rules, missile parry, shield assignment, and the full
-  melee-vs-melee initiative modifiers are not yet implemented.
-- React's no-target movement allowance is not yet available; waiting is supported.
-- Critical recoil, unresolved conditional critical clauses, and all situational
-  critical consequences are not fully automated. Review markers remain visible.
-- Spell equipment/encumbrance restrictions and complete status/casting modifiers
-  need their source audit. Current scenarios avoid prohibited caster armor.
-- Native controls do not yet expose the full browser spell/declaration panel.
+Three scenarios live in `assets/tactical/{0,1,2}.json`. These are designed level
+five statblocks, not verbatim printed characters. Base movement is 50 feet,
+Quickness/Strength bonuses are zero, and hexes are five feet. Walls block movement
+and sight. Dead/unconscious fighters do not occupy movement hexes. The original
+Zemeroth artwork, geometry and pathfinder remain; its old AP/combat rules do not
+run in this mode.
 
-These limits must not be described as complete Rolemaster rules fidelity.
+Preserved combat includes equipped weapon tables, ranges, reload, open-ended
+d100, equipment-selected criticals, seven curated spells, PP, Mentalism basic
+attacks and resistance tables, bleeding, cumulative stun, death timers,
+structural disability, and one-handed/missile fumble consequences.
+
+This remains experimental. Casting partial/near/unusual results and complete
+spell-failure handling, opportunity attacks, shield assignment, full situational
+initiative modifiers, critical recoil, unresolved conditional critical clauses,
+and complete equipment/encumbrance restrictions remain outside current coverage.
+The simplified turn rules deliberately omit Prepare, Press, React and Disengage.
+Do not describe this mode as complete printed Rolemaster fidelity.
 
 ## Build and verification
+
+Rust 1.99.0, Cargo.lock and resvg 0.23.0 are pinned. The browser loader is vendored
+from sapp-wasm 0.1.26; audio glue comes from macroquad 0.3.7.
 
 ```sh
 cargo install resvg --version 0.23.0 --locked
@@ -95,21 +91,15 @@ sh utils/wasm/build.sh
 python3 -m http.server 8022 --directory static
 ```
 
-The workspace suite retains 39 upstream game tests and adds scenario validation,
-terrain pathfinding, AI isolation and completion of all three skirmishes. The
-shared core separately tests table parity, activity budgets, phase ordering,
-movement, invalid targets, healing restrictions, conditions, save determinism,
-atomic errors and paused React choices.
+`tests/browser-smoke.js` runs via Playwright CLI `run-code --filename`. It checks
+five viewport sizes, absence of declaration controls, touch movement and target
+selection, duplicate movement/actions, exact mid-turn reload, reserves, replay,
+failed saves, legacy preservation, stale tabs and completion of all three maps.
+Create `output/playwright/` for its ignored screenshots.
 
-`tests/browser-smoke.js` is a Playwright CLI `run-code --filename` test, including
-five viewport sizes, declarations, duplicate commits, save/reload, replay, save
-failure, stale tabs and complete battles. It expects the server above.
-
-
-Verified locally on 2026-10-19: 45 game tests plus the upstream documentation
-example, 22 tactical core tests (including 945 JS lookup parity cases), 7 existing
-Rust core tests, 55 existing JS core tests, and all 180 fieldbook tests. The browser
-smoke completed all three scenarios and passed its five viewport, duplicate
-commit, exact reload, replay, failed-save and stale-tab checks. Review captures
-are written under `output/playwright/` (create this directory before running the
-CLI smoke; screenshots are intentionally ignored by Git).
+The Rust game suite includes deterministic save/reload comparison at every step
+of all three simplified battles, plus retained upstream and full-round tests.
+Core tests cover initiative ties, movement plus action, unprepared casting,
+utility progress, skipped turns, cleanup exactly once, invalid-command atomicity,
+and reserve behavior for repeated attackers, misses, fumbles, critical-only
+results, insufficient reserves, prohibited parrying, missiles/spells and expiry.

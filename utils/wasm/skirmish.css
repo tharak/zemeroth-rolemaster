@@ -6,3 +6,4 @@
 #map-caption{top:12px;right:10px;left:auto;bottom:auto;max-width:45%;text-align:right}
 canvas{cursor:crosshair}
 .battlefield canvas{height:calc(100% - 50px)}
+#initiative{display:flex;flex-wrap:wrap;gap:.3rem;padding:0;list-style:none;font-size:.8rem}#initiative li{padding:.35rem;border:1px solid #67736c;border-radius:.35rem}#initiative .active{border:2px solid #efc875;color:#ffe2a4;font-weight:bold}#initiative .completed{opacity:.55}#actions button{min-height:44px}#utilities{flex-wrap:wrap}
